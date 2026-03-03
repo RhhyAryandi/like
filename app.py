@@ -17,6 +17,7 @@ from urllib3.exceptions import InsecureRequestWarning
 import os
 import threading
 import time
+import base64
 from datetime import datetime, timedelta
 
 warnings.simplefilter('ignore', InsecureRequestWarning)
@@ -30,6 +31,62 @@ ACCOUNTS_FILE = "accounts.txt"          # File containing uid:password lines
 TOKEN_FILE_BD = "token_bd.json"          # Token file to update
 TOKEN_REFRESH_INTERVAL_HOURS = 2         # Refresh tokens every 2 hours
 TOKEN_API_URL = "https://rizerxguestaccountacceee.vercel.app//rizer"  # Token API endpoint
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO = "RhhyAryandi/like"
+GITHUB_BRANCH = "main"
+GITHUB_FILE_PATH = "token-id.json"
+
+def push_token_file_to_github():
+    try:
+        if not GITHUB_TOKEN:
+            app.logger.error("GITHUB_TOKEN belum diset.")
+            return False
+
+        if not os.path.exists(TOKEN_FILE_BD):
+            app.logger.error("token_bd.json tidak ditemukan.")
+            return False
+
+        with open(TOKEN_FILE_BD, "r") as f:
+            content_data = json.load(f)
+
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE_PATH}"
+
+        headers = {
+            "Authorization": f"Bearer {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github+json"
+        }
+
+        get_resp = requests.get(url, headers=headers, params={"ref": GITHUB_BRANCH})
+        sha = None
+        if get_resp.status_code == 200:
+            sha = get_resp.json()["sha"]
+
+        encoded_content = base64.b64encode(
+            json.dumps(content_data, indent=2).encode()
+        ).decode()
+
+        payload = {
+            "message": f"Manual refresh token-id.json {datetime.utcnow().isoformat()}",
+            "content": encoded_content,
+            "branch": GITHUB_BRANCH
+        }
+
+        if sha:
+            payload["sha"] = sha
+
+        put_resp = requests.put(url, headers=headers, json=payload)
+
+        if put_resp.status_code in [200, 201]:
+            app.logger.info("token-id.json berhasil di-push ke GitHub.")
+            return True
+        else:
+            app.logger.error(f"Gagal push GitHub: {put_resp.text}")
+            return False
+
+    except Exception as e:
+        app.logger.error(f"Push GitHub error: {e}")
+        return False
 
 def load_accounts_from_file():
     """
@@ -422,6 +479,16 @@ def handle_requests():
         return jsonify(result)
     except Exception as e:
         app.logger.error(f"Main request processing failed: {e}")
+        return jsonify({"error": str(e)}), 500
+        
+@app.route('/refresh', methods=['GET'])
+def manual_refresh():
+    try:
+        refresh_all_tokens()      # Refresh & update token_bd.json lokal
+        push_token_file_to_github()  # Push ke GitHub
+        return jsonify({"status": "Refresh & push to GitHub executed"}), 200
+    except Exception as e:
+        app.logger.error(f"Manual refresh error: {e}")
         return jsonify({"error": str(e)}), 500
 
 # ================= Start background scheduler and run app on all interfaces =================
