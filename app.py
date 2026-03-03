@@ -35,7 +35,7 @@ TOKEN_API_URL = "https://rizerxguestaccountacceee.vercel.app//rizer"  # Token AP
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = "RhhyAryandi/like"
 GITHUB_BRANCH = "main"
-GITHUB_FILE_PATH = "token-id.json"
+GITHUB_FILE_PATH = "token_id.json"
 
 def push_token_file_to_github():
     try:
@@ -67,7 +67,7 @@ def push_token_file_to_github():
         ).decode()
 
         payload = {
-            "message": f"Manual refresh token-id.json {datetime.utcnow().isoformat()}",
+            "message": f"Manual refresh token_id.json {datetime.utcnow().isoformat()}",
             "content": encoded_content,
             "branch": GITHUB_BRANCH
         }
@@ -78,7 +78,7 @@ def push_token_file_to_github():
         put_resp = requests.put(url, headers=headers, json=payload)
 
         if put_resp.status_code in [200, 201]:
-            app.logger.info("token-id.json berhasil di-push ke GitHub.")
+            app.logger.info("token_id.json berhasil di-push ke GitHub.")
             return True
         else:
             app.logger.error(f"Gagal push GitHub: {put_resp.text}")
